@@ -1,17 +1,6 @@
+mod macros;
 #[cfg(test)]
 mod sample_tests;
-
-pub fn sudoku(bytes: [[u8; 9]; 9]) -> Result<[[u8; 9]; 9], NoSolution> {
-    let grid = Grid::from_u8s(bytes);
-    grid.solve().map(|grid| grid.into_u8s())
-}
-
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-#[error("No possible values for cell ({}, {})", self.col, self.row)]
-pub struct NoSolution {
-    pub row: usize,
-    pub col: usize,
-}
 
 struct Constraint {
     row: usize,
@@ -19,22 +8,23 @@ struct Constraint {
     value: u8,
 }
 
-struct Cell([bool; 9]);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cell([bool; 9]);
 
 impl Cell {
-    fn from_u8(value: u8) -> Self {
-        match value {
-            0 => Self([true; 9]),
-            n => {
-                let mut cell = [false; 9];
-                cell[n as usize - 1] = true;
-                Self(cell)
-            }
-        }
+    pub fn empty() -> Self {
+        Self([true; 9])
     }
 
-    fn into_u8(self) -> u8 {
-        self.known().unwrap_or(0)
+    pub fn value(value: u8) -> Option<Self> {
+        match value {
+            1..=9 => {
+                let mut cell = [false; 9];
+                cell[value as usize - 1] = true;
+                Some(Self(cell))
+            }
+            _ => None,
+        }
     }
 
     fn constrain(&mut self, value: u8) -> Option<u8> {
@@ -57,32 +47,35 @@ impl Cell {
 
         Some(value as u8 + 1)
     }
+}
 
-    fn no_value(&self) -> bool {
-        !self.0.iter().any(|&v| v)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unsolved;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Solved;
+
+#[derive(Debug, Clone, Eq)]
+pub struct Grid<State>([[Cell; 9]; 9], State);
+
+impl<LhsState, RhsState> PartialEq<Grid<RhsState>> for Grid<LhsState> {
+    fn eq(&self, other: &Grid<RhsState>) -> bool {
+        self.0 == other.0
     }
 }
 
-pub struct Grid([[Cell; 9]; 9]);
-
-impl Grid {
-    pub fn from_u8s(grid: [[u8; 9]; 9]) -> Self {
-        Self(grid.map(|row| row.map(Cell::from_u8)))
+impl Grid<Unsolved> {
+    pub fn from_cells(grid: [[Cell; 9]; 9]) -> Self {
+        Self(grid, Unsolved)
     }
 
-    pub fn into_u8s(self) -> [[u8; 9]; 9] {
-        self.0.map(|row| row.map(Cell::into_u8))
-    }
-
-    pub fn solve(mut self) -> Result<Self, NoSolution> {
+    pub fn solve(mut self) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
         let mut constraints = self.initial_constraints();
         while !constraints.is_empty() {
             constraints = self.apply_constraints(&constraints);
         }
 
-        self.check_solution()?;
-
-        Ok(self)
+        self.into_solved()
     }
 
     fn initial_constraints(&self) -> Vec<Constraint> {
@@ -163,14 +156,21 @@ impl Grid {
         new_constraints
     }
 
-    fn check_solution(&self) -> Result<(), NoSolution> {
+    fn into_solved(self) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
+        let mut unsolved = vec![];
+
         for row in 0..9 {
             for col in 0..9 {
-                if self.0[row][col].no_value() {
-                    return Err(NoSolution { row, col });
+                if self.0[row][col].known().is_none() {
+                    unsolved.push((row, col));
                 }
             }
         }
-        Ok(())
+
+        if unsolved.is_empty() {
+            Ok(Grid(self.0, Solved))
+        } else {
+            Err(unsolved)
+        }
     }
 }
