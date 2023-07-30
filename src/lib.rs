@@ -1,10 +1,18 @@
 #[cfg(test)]
 mod sample_tests;
 
-pub fn sudoku(bytes: &mut [[u8; 9]; 9]) {
+pub fn sudoku(bytes: &mut [[u8; 9]; 9]) -> Result<(), NoSolution> {
     let mut grid = Grid::from_u8s(bytes);
-    grid.solve();
-    *bytes = grid.into_u8s()
+    grid.solve()?;
+    *bytes = grid.into_u8s();
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[error("No possible values for cell ({}, {})", self.col, self.row)]
+pub struct NoSolution {
+    pub row: usize,
+    pub col: usize,
 }
 
 struct Constraint {
@@ -51,6 +59,10 @@ impl Cell {
 
         Some(value as u8 + 1)
     }
+
+    fn no_value(&self) -> bool {
+        !self.0.iter().any(|&v| v)
+    }
 }
 
 pub struct Grid([[Cell; 9]; 9]);
@@ -64,11 +76,13 @@ impl Grid {
         self.0.map(|row| row.map(Cell::into_u8))
     }
 
-    pub fn solve(&mut self) {
+    pub fn solve(&mut self) -> Result<(), NoSolution> {
         let mut constraints = self.initial_constraints();
         while !constraints.is_empty() {
             constraints = self.apply_constraints(&constraints);
         }
+
+        self.check_solution()
     }
 
     fn initial_constraints(&self) -> Vec<Constraint> {
@@ -147,5 +161,16 @@ impl Grid {
         }
 
         new_constraints
+    }
+
+    fn check_solution(&self) -> Result<(), NoSolution> {
+        for row in 0..9 {
+            for col in 0..9 {
+                if self.0[row][col].no_value() {
+                    return Err(NoSolution { row, col });
+                }
+            }
+        }
+        Ok(())
     }
 }
