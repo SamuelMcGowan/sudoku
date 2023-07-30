@@ -55,7 +55,10 @@ impl Cell {
 
 impl Grid<Unsolved> {
     pub fn solve(self, max_depth: usize) -> SolutionResult {
-        let result = self.solve_inner(vec![], 0, max_depth);
+        println!("gathering initial constraints");
+        let constraints = self.initial_constraints();
+
+        let result = self.solve_inner(constraints, 0, max_depth);
         if result.is_ok() {
             println!("FOUND A SOLUTION");
         } else {
@@ -66,14 +69,11 @@ impl Grid<Unsolved> {
 
     fn solve_inner(
         mut self,
-        constraints: Vec<Constraint>,
+        mut constraints: Vec<Constraint>,
         depth: usize,
         max_depth: usize,
     ) -> SolutionResult {
-        println!("depth: {depth}");
-
-        println!("gathering initial constraints");
-        let mut constraints = self.initial_constraints(constraints);
+        println!("depth: {depth}, constraints: {}", constraints.len());
 
         while !constraints.is_empty() {
             println!("applying {} constraints", constraints.len());
@@ -108,8 +108,8 @@ impl Grid<Unsolved> {
         self.into_solved()
     }
 
-    fn initial_constraints(&self, initial: Vec<Constraint>) -> Vec<Constraint> {
-        let mut constraints = initial;
+    fn initial_constraints(&self) -> Vec<Constraint> {
+        let mut constraints = vec![];
         for row in 0..9 {
             for col in 0..9 {
                 if let Some(known) = self.0[row][col].known() {
