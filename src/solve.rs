@@ -1,3 +1,5 @@
+use log::trace;
+
 use crate::{Cell, Grid, Solved, Unsolved};
 
 #[derive(Debug)]
@@ -18,16 +20,9 @@ struct Constraint {
 
 impl Grid<Unsolved> {
     pub fn solve(self, max_depth: usize) -> SolutionResult {
-        println!("gathering initial constraints");
         let constraints = self.initial_constraints();
 
-        let result = self.solve_inner(constraints, 0, max_depth);
-        if result.is_ok() {
-            println!("FOUND A SOLUTION");
-        } else {
-            println!("DID NOT FIND A SOLUTION");
-        }
-        result
+        self.solve_inner(constraints, 0, max_depth)
     }
 
     fn solve_inner(
@@ -36,17 +31,17 @@ impl Grid<Unsolved> {
         depth: usize,
         max_depth: usize,
     ) -> SolutionResult {
-        println!("depth: {depth}, constraints: {}", constraints.len());
+        trace!("depth: {depth}, constraints: {}", constraints.len());
 
         while !constraints.is_empty() {
-            println!("applying {} constraints", constraints.len());
+            trace!("applying {} constraints", constraints.len());
             constraints = self.apply_constraints(&constraints)?;
         }
 
         if depth < max_depth {
             // recursively solve ambiguities
             for constraint in self.iter_possible_constraints() {
-                println!("trying constraint: {constraint:?}");
+                trace!("trying constraint: {constraint:?}");
 
                 let mut grid = self.clone();
 
@@ -58,13 +53,13 @@ impl Grid<Unsolved> {
                         return Ok(grid);
                     }
                     Err(_) => {
-                        println!("constraint backtracked");
+                        trace!("constraint backtracked");
                         continue;
                     }
                 }
             }
         } else {
-            println!("recursion limit reached, not attempting to solve ambiguities");
+            trace!("recursion limit reached, not attempting to solve ambiguities");
         }
 
         self.check_all_known()?;
@@ -73,6 +68,8 @@ impl Grid<Unsolved> {
     }
 
     fn initial_constraints(&self) -> Vec<Constraint> {
+        trace!("gathering initial constraints");
+
         let mut constraints = vec![];
         for row in 0..9 {
             for col in 0..9 {

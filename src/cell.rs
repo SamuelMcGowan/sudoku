@@ -84,8 +84,9 @@ impl fmt::Debug for Cell {
     }
 }
 
-#[test]
-fn test_unknowns() {
+#[cfg(test)]
+#[test_log::test]
+fn test_unknowns() {    
     let cell = Cell::empty();
     let unknowns: Vec<_> = cell.unknown().collect();
     assert_eq!(unknowns, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);

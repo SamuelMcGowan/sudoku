@@ -1,6 +1,8 @@
 use crate::grid;
 use crate::solve::SolutionError;
 
+use test_log::test;
+
 #[test]
 fn puzzle_1() {
     let puzzle = grid![
