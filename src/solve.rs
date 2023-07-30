@@ -2,8 +2,8 @@ use crate::{Cell, Grid, Solved, Unsolved};
 
 #[derive(Debug)]
 pub enum SolutionError {
-    UnsolvableCells(Vec<(usize, usize)>),
-    UnsolvedCells(Vec<(usize, usize)>),
+    CellConflict(usize, usize),
+    CellUnknown(usize, usize),
     RecursionLimitReached,
 }
 
@@ -14,52 +14,6 @@ struct Constraint {
     row: usize,
     col: usize,
     value: u8,
-}
-
-impl Cell {
-    fn constrain(&mut self, value: u8) -> Option<u8> {
-        if !self.0[value as usize - 1] {
-            return None;
-        }
-
-        self.0[value as usize - 1] = false;
-        self.known()
-    }
-
-    fn known(&self) -> Option<u8> {
-        let mut values = self.0.iter();
-
-        let value = values.position(|&v| v)?;
-
-        if values.any(|&v| v) {
-            return None;
-        }
-
-        Some(value as u8 + 1)
-    }
-
-    fn iter_unknown(&self) -> impl Iterator<Item = u8> + '_ {
-        (if self.known().is_none() {
-            Some(
-                self.0
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, &v)| v.then_some(i as u8 + 1)),
-            )
-        } else {
-            None
-        })
-        .into_iter()
-        .flatten()
-    }
-
-    fn len(&self) -> usize {
-        self.0.iter().filter(|&&v| v).count()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 impl Grid<Unsolved> {
@@ -86,10 +40,8 @@ impl Grid<Unsolved> {
 
         while !constraints.is_empty() {
             println!("applying {} constraints", constraints.len());
-            constraints = self.apply_constraints(&constraints);
+            constraints = self.apply_constraints(&constraints)?;
         }
-
-        self.check_cells(|cell| !cell.is_empty(), SolutionError::UnsolvableCells)?;
 
         if depth < max_depth {
             // recursively solve ambiguities
@@ -115,7 +67,8 @@ impl Grid<Unsolved> {
             println!("recursion limit reached, not attempting to solve ambiguities");
         }
 
-        self.check_cells(|cell| cell.len() == 1, SolutionError::UnsolvedCells)?;
+        self.check_all_known()?;
+
         Ok(Grid(self.0, Solved))
     }
 
@@ -135,7 +88,7 @@ impl Grid<Unsolved> {
         constraints
     }
 
-    fn apply_constraints(&mut self, constraints: &[Constraint]) -> Vec<Constraint> {
+    fn apply_constraints(&mut self, constraints: &[Constraint]) -> SolutionResult<Vec<Constraint>> {
         let mut new_constraints = vec![];
 
         for constraint in constraints {
@@ -144,7 +97,7 @@ impl Grid<Unsolved> {
                     continue;
                 }
 
-                if let Some(known) = cell.constrain(constraint.value) {
+                if let Some(known) = cell.constrain(constraint.row, col, constraint.value)? {
                     new_constraints.push(Constraint {
                         row: constraint.row,
                         col,
@@ -163,7 +116,7 @@ impl Grid<Unsolved> {
                     continue;
                 }
 
-                if let Some(known) = cell.constrain(constraint.value) {
+                if let Some(known) = cell.constrain(row, constraint.col, constraint.value)? {
                     new_constraints.push(Constraint {
                         row,
                         col: constraint.col,
@@ -183,7 +136,7 @@ impl Grid<Unsolved> {
 
                     let cell = &mut self.0[row][col];
 
-                    if let Some(known) = cell.constrain(constraint.value) {
+                    if let Some(known) = cell.constrain(row, col, constraint.value)? {
                         new_constraints.push(Constraint {
                             row,
                             col,
@@ -194,29 +147,19 @@ impl Grid<Unsolved> {
             }
         }
 
-        new_constraints
+        Ok(new_constraints)
     }
 
-    fn check_cells(
-        &self,
-        is_ok: impl Fn(&Cell) -> bool,
-        make_err: impl Fn(Vec<(usize, usize)>) -> SolutionError,
-    ) -> SolutionResult<()> {
-        let mut errors = vec![];
-
+    fn check_all_known(&self) -> SolutionResult<()> {
         for row in 0..9 {
             for col in 0..9 {
-                if !is_ok(&self.0[row][col]) {
-                    errors.push((row, col));
+                if !self.0[row][col].is_known() {
+                    return Err(SolutionError::CellUnknown(row, col));
                 }
             }
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(make_err(errors))
-        }
+        Ok(())
     }
 
     fn iter_cells_with_positions(&self) -> impl Iterator<Item = (usize, usize, &Cell)> + '_ {
@@ -230,7 +173,7 @@ impl Grid<Unsolved> {
     fn iter_possible_constraints(&self) -> impl Iterator<Item = Constraint> + '_ {
         self.iter_cells_with_positions()
             .flat_map(|(row, col, cell)| {
-                cell.iter_unknown()
+                cell.unknown()
                     .map(move |value| Constraint { row, col, value })
             })
     }

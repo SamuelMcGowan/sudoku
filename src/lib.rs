@@ -1,27 +1,10 @@
+use cell::Cell;
+
+mod cell;
 mod macros;
 #[cfg(test)]
 mod sample_tests;
 mod solve;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Cell([bool; 9]);
-
-impl Cell {
-    pub fn empty() -> Self {
-        Self([true; 9])
-    }
-
-    pub fn value(value: u8) -> Option<Self> {
-        match value {
-            1..=9 => {
-                let mut cell = [false; 9];
-                cell[value as usize - 1] = true;
-                Some(Self(cell))
-            }
-            _ => None,
-        }
-    }
-}
 
 type GridArray = [[Cell; 9]; 9];
 
