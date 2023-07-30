@@ -4,7 +4,7 @@ use super::sudoku;
 
 #[test]
 fn puzzle_1() {
-    let mut puzzle = [
+    let puzzle = [
         [6, 0, 5, 7, 2, 0, 0, 3, 9],
         [4, 0, 0, 0, 0, 5, 1, 0, 0],
         [0, 2, 0, 1, 0, 0, 0, 0, 4],
@@ -27,16 +27,16 @@ fn puzzle_1() {
         [3, 5, 1, 2, 6, 7, 4, 9, 8],
     ];
 
-    sudoku(&mut puzzle).unwrap();
+    let output = sudoku(puzzle).unwrap();
     assert_eq!(
-        puzzle, solution,
+        output, solution,
         "\nYour solution (left) did not match the correct solution (right)"
     );
 }
 
 #[test]
 fn puzzle_2() {
-    let mut puzzle = [
+    let puzzle = [
         [0, 0, 8, 0, 3, 0, 5, 4, 0],
         [3, 0, 0, 4, 0, 7, 9, 0, 0],
         [4, 1, 0, 0, 0, 8, 0, 0, 2],
@@ -59,16 +59,16 @@ fn puzzle_2() {
         [6, 2, 9, 1, 7, 4, 8, 5, 3],
     ];
 
-    sudoku(&mut puzzle).unwrap();
+    let output = sudoku(puzzle).unwrap();
     assert_eq!(
-        puzzle, solution,
+        output, solution,
         "\nYour solution (left) did not match the correct solution (right)"
     );
 }
 
 #[test]
 fn check_no_solution() {
-    let mut puzzle = [
+    let puzzle = [
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -80,5 +80,5 @@ fn check_no_solution() {
         [1, 0, 3, 4, 5, 6, 7, 8, 9],
     ];
 
-    assert_eq!(sudoku(&mut puzzle), Err(NoSolution { row: 8, col: 1 }));
+    assert_eq!(sudoku(puzzle), Err(NoSolution { row: 8, col: 1 }));
 }

@@ -1,11 +1,9 @@
 #[cfg(test)]
 mod sample_tests;
 
-pub fn sudoku(bytes: &mut [[u8; 9]; 9]) -> Result<(), NoSolution> {
-    let mut grid = Grid::from_u8s(bytes);
-    grid.solve()?;
-    *bytes = grid.into_u8s();
-    Ok(())
+pub fn sudoku(bytes: [[u8; 9]; 9]) -> Result<[[u8; 9]; 9], NoSolution> {
+    let grid = Grid::from_u8s(bytes);
+    grid.solve().map(|grid| grid.into_u8s())
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -68,7 +66,7 @@ impl Cell {
 pub struct Grid([[Cell; 9]; 9]);
 
 impl Grid {
-    pub fn from_u8s(grid: &[[u8; 9]; 9]) -> Self {
+    pub fn from_u8s(grid: [[u8; 9]; 9]) -> Self {
         Self(grid.map(|row| row.map(Cell::from_u8)))
     }
 
@@ -76,13 +74,15 @@ impl Grid {
         self.0.map(|row| row.map(Cell::into_u8))
     }
 
-    pub fn solve(&mut self) -> Result<(), NoSolution> {
+    pub fn solve(mut self) -> Result<Self, NoSolution> {
         let mut constraints = self.initial_constraints();
         while !constraints.is_empty() {
             constraints = self.apply_constraints(&constraints);
         }
 
-        self.check_solution()
+        self.check_solution()?;
+
+        Ok(self)
     }
 
     fn initial_constraints(&self) -> Vec<Constraint> {
