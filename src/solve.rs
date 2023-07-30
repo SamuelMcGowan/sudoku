@@ -3,10 +3,11 @@ use crate::{Cell, Grid, Solved, Unsolved};
 #[derive(Debug)]
 pub enum SolutionError {
     UnsolvableCells(Vec<(usize, usize)>),
+    UnsolvedCells(Vec<(usize, usize)>),
     RecursionLimitReached,
 }
 
-pub type SolutionResult = Result<Grid<Solved>, SolutionError>;
+pub type SolutionResult<T = Grid<Solved>> = Result<T, SolutionError>;
 
 #[derive(Debug)]
 struct Constraint {
@@ -51,6 +52,14 @@ impl Cell {
         .into_iter()
         .flatten()
     }
+
+    fn len(&self) -> usize {
+        self.0.iter().filter(|&&v| v).count()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Grid<Unsolved> {
@@ -80,32 +89,34 @@ impl Grid<Unsolved> {
             constraints = self.apply_constraints(&constraints);
         }
 
-        if depth >= max_depth {
-            println!("recursion limit reached, not attempting to solve ambiguities");
-            return self.into_solved();
-        }
+        self.check_cells(|cell| !cell.is_empty(), SolutionError::UnsolvableCells)?;
 
-        // recursively solve ambiguities
-        for constraint in self.iter_possible_constraints() {
-            println!("trying constraint: {constraint:?}");
+        if depth < max_depth {
+            // recursively solve ambiguities
+            for constraint in self.iter_possible_constraints() {
+                println!("trying constraint: {constraint:?}");
 
-            let mut grid = self.clone();
+                let mut grid = self.clone();
 
-            grid.0[constraint.row][constraint.col] = Cell::value(constraint.value).unwrap();
+                grid.0[constraint.row][constraint.col] = Cell::value(constraint.value).unwrap();
 
-            match grid.solve_inner(vec![constraint], depth + 1, max_depth) {
-                Ok(grid) => {
-                    return Ok(grid);
-                }
-                Err(_) => {
-                    println!("constraint backtracked");
-                    continue;
+                match grid.solve_inner(vec![constraint], depth + 1, max_depth) {
+                    Ok(grid) => {
+                        // short-circuit and return solved grid
+                        return Ok(grid);
+                    }
+                    Err(_) => {
+                        println!("constraint backtracked");
+                        continue;
+                    }
                 }
             }
+        } else {
+            println!("recursion limit reached, not attempting to solve ambiguities");
         }
 
-        // if there no ambiguities, just check the solution and return it
-        self.into_solved()
+        self.check_cells(|cell| cell.len() == 1, SolutionError::UnsolvedCells)?;
+        Ok(Grid(self.0, Solved))
     }
 
     fn initial_constraints(&self) -> Vec<Constraint> {
@@ -186,21 +197,25 @@ impl Grid<Unsolved> {
         new_constraints
     }
 
-    fn into_solved(self) -> SolutionResult {
-        let mut unsolved = vec![];
+    fn check_cells(
+        &self,
+        is_ok: impl Fn(&Cell) -> bool,
+        make_err: impl Fn(Vec<(usize, usize)>) -> SolutionError,
+    ) -> SolutionResult<()> {
+        let mut errors = vec![];
 
         for row in 0..9 {
             for col in 0..9 {
-                if self.0[row][col].known().is_none() {
-                    unsolved.push((row, col));
+                if !is_ok(&self.0[row][col]) {
+                    errors.push((row, col));
                 }
             }
         }
 
-        if unsolved.is_empty() {
-            Ok(Grid(self.0, Solved))
+        if errors.is_empty() {
+            Ok(())
         } else {
-            Err(SolutionError::UnsolvableCells(unsolved))
+            Err(make_err(errors))
         }
     }
 

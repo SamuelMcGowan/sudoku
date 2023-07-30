@@ -117,6 +117,6 @@ fn check_no_solution() {
     ];
 
     assert!(
-        matches!(puzzle.solve(0), Err(SolutionError::UnsolvableCells(errs)) if errs.contains(&(8, 1)))
+        matches!(puzzle.solve(1), Err(SolutionError::UnsolvableCells(errs)) if errs.contains(&(8, 1)))
     );
 }
