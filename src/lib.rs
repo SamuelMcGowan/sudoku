@@ -21,19 +21,9 @@ impl Cell {
             _ => None,
         }
     }
-
-    fn known(&self) -> Option<u8> {
-        let mut values = self.0.iter();
-
-        let value = values.position(|&v| v)?;
-
-        if values.any(|&v| v) {
-            return None;
-        }
-
-        Some(value as u8 + 1)
-    }
 }
+
+type GridArray = [[Cell; 9]; 9];
 
 macro_rules! states {
     ($($state:ident),*) => {
@@ -47,7 +37,7 @@ macro_rules! states {
 states! {Solved, Unsolved}
 
 #[derive(Debug, Clone, Eq)]
-pub struct Grid<State>([[Cell; 9]; 9], State);
+pub struct Grid<State>(Box<GridArray>, State);
 
 impl<LhsState, RhsState> PartialEq<Grid<RhsState>> for Grid<LhsState> {
     fn eq(&self, other: &Grid<RhsState>) -> bool {
@@ -57,6 +47,6 @@ impl<LhsState, RhsState> PartialEq<Grid<RhsState>> for Grid<LhsState> {
 
 impl Grid<Unsolved> {
     pub fn from_cells(grid: [[Cell; 9]; 9]) -> Self {
-        Self(grid, Unsolved)
+        Self(Box::new(grid), Unsolved)
     }
 }

@@ -1,5 +1,6 @@
 use crate::{Cell, Grid, Solved, Unsolved};
 
+#[derive(Debug)]
 struct Constraint {
     row: usize,
     col: usize,
@@ -15,20 +16,80 @@ impl Cell {
         self.0[value as usize - 1] = false;
         self.known()
     }
+
+    fn known(&self) -> Option<u8> {
+        let mut values = self.0.iter();
+
+        let value = values.position(|&v| v)?;
+
+        if values.any(|&v| v) {
+            return None;
+        }
+
+        Some(value as u8 + 1)
+    }
+
+    fn iter_unknown(&self) -> impl Iterator<Item = u8> + '_ {
+        (if self.known().is_none() {
+            Some(
+                self.0
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &v)| v.then_some(i as u8 + 1)),
+            )
+        } else {
+            None
+        })
+        .into_iter()
+        .flatten()
+    }
 }
 
 impl Grid<Unsolved> {
-    pub fn solve(mut self) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
-        let mut constraints = self.initial_constraints();
+    pub fn solve(self) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
+        self.solve_inner(vec![], 0)
+    }
+
+    fn solve_inner(
+        mut self,
+        constraints: Vec<Constraint>,
+        depth: usize,
+    ) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
+        println!("depth: {depth}");
+
+        println!("gathering initial constraints");
+        let mut constraints = self.initial_constraints(constraints);
+
         while !constraints.is_empty() {
+            println!("applying {} constraints", constraints.len());
             constraints = self.apply_constraints(&constraints);
         }
 
+        // recursively solve ambiguities
+        for constraint in self.iter_possible_constraints() {
+            println!("trying constraint: {constraint:?}");
+
+            let mut grid = self.clone();
+
+            grid.0[constraint.row][constraint.col] = Cell::value(constraint.value).unwrap();
+
+            match grid.solve_inner(vec![constraint], depth + 1) {
+                Ok(grid) => {
+                    return Ok(grid);
+                }
+                Err(_) => {
+                    println!("constraint backtracked");
+                    continue;
+                }
+            }
+        }
+
+        // if there no ambiguities, just check the solution and return it
         self.into_solved()
     }
 
-    fn initial_constraints(&self) -> Vec<Constraint> {
-        let mut constraints = vec![];
+    fn initial_constraints(&self, initial: Vec<Constraint>) -> Vec<Constraint> {
+        let mut constraints = initial;
         for row in 0..9 {
             for col in 0..9 {
                 if let Some(known) = self.0[row][col].known() {
@@ -121,5 +182,21 @@ impl Grid<Unsolved> {
         } else {
             Err(unsolved)
         }
+    }
+
+    fn iter_cells_with_positions(&self) -> impl Iterator<Item = (usize, usize, &Cell)> + '_ {
+        self.0.iter().enumerate().flat_map(|(row_i, row)| {
+            row.iter()
+                .enumerate()
+                .map(move |(col_i, cell)| (row_i, col_i, cell))
+        })
+    }
+
+    fn iter_possible_constraints(&self) -> impl Iterator<Item = Constraint> + '_ {
+        self.iter_cells_with_positions()
+            .flat_map(|(row, col, cell)| {
+                cell.iter_unknown()
+                    .map(move |value| Constraint { row, col, value })
+            })
     }
 }
