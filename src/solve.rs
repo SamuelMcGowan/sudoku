@@ -1,6 +1,14 @@
 use crate::{Cell, Grid, Solved, Unsolved};
 
 #[derive(Debug)]
+pub enum SolutionError {
+    UnsolvableCells(Vec<(usize, usize)>),
+    RecursionLimitReached,
+}
+
+pub type SolutionResult = Result<Grid<Solved>, SolutionError>;
+
+#[derive(Debug)]
 struct Constraint {
     row: usize,
     col: usize,
@@ -46,15 +54,22 @@ impl Cell {
 }
 
 impl Grid<Unsolved> {
-    pub fn solve(self) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
-        self.solve_inner(vec![], 0)
+    pub fn solve(self, max_depth: usize) -> SolutionResult {
+        let result = self.solve_inner(vec![], 0, max_depth);
+        if result.is_ok() {
+            println!("FOUND A SOLUTION");
+        } else {
+            println!("DID NOT FIND A SOLUTION");
+        }
+        result
     }
 
     fn solve_inner(
         mut self,
         constraints: Vec<Constraint>,
         depth: usize,
-    ) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
+        max_depth: usize,
+    ) -> SolutionResult {
         println!("depth: {depth}");
 
         println!("gathering initial constraints");
@@ -65,6 +80,11 @@ impl Grid<Unsolved> {
             constraints = self.apply_constraints(&constraints);
         }
 
+        if depth >= max_depth {
+            println!("recursion limit reached, not attempting to solve ambiguities");
+            return self.into_solved();
+        }
+
         // recursively solve ambiguities
         for constraint in self.iter_possible_constraints() {
             println!("trying constraint: {constraint:?}");
@@ -73,7 +93,7 @@ impl Grid<Unsolved> {
 
             grid.0[constraint.row][constraint.col] = Cell::value(constraint.value).unwrap();
 
-            match grid.solve_inner(vec![constraint], depth + 1) {
+            match grid.solve_inner(vec![constraint], depth + 1, max_depth) {
                 Ok(grid) => {
                     return Ok(grid);
                 }
@@ -166,7 +186,7 @@ impl Grid<Unsolved> {
         new_constraints
     }
 
-    fn into_solved(self) -> Result<Grid<Solved>, Vec<(usize, usize)>> {
+    fn into_solved(self) -> SolutionResult {
         let mut unsolved = vec![];
 
         for row in 0..9 {
@@ -180,7 +200,7 @@ impl Grid<Unsolved> {
         if unsolved.is_empty() {
             Ok(Grid(self.0, Solved))
         } else {
-            Err(unsolved)
+            Err(SolutionError::UnsolvableCells(unsolved))
         }
     }
 

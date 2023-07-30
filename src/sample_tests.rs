@@ -1,4 +1,5 @@
 use crate::grid;
+use crate::solve::SolutionError;
 
 #[test]
 fn puzzle_1() {
@@ -25,7 +26,7 @@ fn puzzle_1() {
         [3 5 1 2 6 7 4 9 8]
     ];
 
-    let output = puzzle.solve().unwrap();
+    let output = puzzle.solve(0).unwrap();
     assert_eq!(
         output, solution,
         "\nYour solution (left) did not match the correct solution (right)"
@@ -58,7 +59,7 @@ fn puzzle_2() {
         [6 2 9 1 7 4 8 5 3]
     ];
 
-    let output = puzzle.solve().unwrap();
+    let output = puzzle.solve(0).unwrap();
     assert_eq!(
         output, solution,
         "\nYour solution (left) did not match the correct solution (right)"
@@ -79,5 +80,7 @@ fn check_no_solution() {
         [1 _ 3 4 5 6 7 8 9]
     ];
 
-    assert!(matches!(puzzle.solve(), Err(errs) if errs.contains(&(8, 1))));
+    assert!(
+        matches!(puzzle.solve(0), Err(SolutionError::UnsolvableCells(errs)) if errs.contains(&(8, 1)))
+    );
 }
